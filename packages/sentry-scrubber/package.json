@@ -1,0 +1,21 @@
+{
+  "name": "@pulsartrack/sentry-scrubber",
+  "version": "1.0.0",
+  "description": "Shared Sentry event scrubber for PulsarTrack frontend and backend",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest --run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["sentry", "scrubber", "security", "stellar"],
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@stellar/stellar-sdk": "^14.5.0",
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

@@ -13,6 +13,17 @@ if (!envJwtSecret) {
 
 const JWT_SECRET = envJwtSecret ?? crypto.randomBytes(32).toString("hex");
 
+/**
+ * Custom error class for invalid tokens.
+ * Allows callers to distinguish token errors from other exceptions.
+ */
+export class InvalidTokenError extends Error {
+  constructor(message: string = "Invalid token") {
+    super(message);
+    this.name = "InvalidTokenError";
+  }
+}
+
 export function createJwt(payload: Record<string, any>): string {
   const header = Buffer.from(
     JSON.stringify({ alg: "HS256", typ: "JWT" }),
@@ -42,36 +53,75 @@ function safeCompareSignatures(actual: string, expected: string): boolean {
   return crypto.timingSafeEqual(actualBuf, expectedBuf);
 }
 
+/**
+ * Decode and verify a JWT token.
+ * 
+ * Security-critical flow:
+ * 1. Check segment count (must be 3)
+ * 2. Verify HMAC signature over raw segments BEFORE parsing
+ * 3. Parse header and validate alg/typ
+ * 4. Parse payload
+ * 5. Check expiry
+ * 
+ * All failures throw InvalidTokenError with a safe, generic message.
+ * No SyntaxError or internal parser details ever escape.
+ */
 export function decodeJwt(token: string): Record<string, any> {
-  const parts = token.split(".");
-  if (parts.length !== 3) throw new Error("Malformed token");
-  const [headerB64, body, sig] = parts;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      throw new InvalidTokenError("Invalid token format");
+    }
 
-  // Validate header: must be exactly {"alg":"HS256","typ":"JWT"}.
-  const header = JSON.parse(Buffer.from(headerB64, "base64url").toString());
-  if (header.alg !== "HS256" || header.typ !== "JWT") {
-    throw new Error("Invalid token header");
+    const [headerB64, bodyB64, sig] = parts;
+
+    // CRITICAL: Verify signature BEFORE parsing anything
+    const expected = crypto
+      .createHmac("sha256", JWT_SECRET)
+      .update(`${headerB64}.${bodyB64}`)
+      .digest("base64url");
+
+    if (!safeCompareSignatures(sig, expected)) {
+      throw new InvalidTokenError("Invalid token signature");
+    }
+
+    // Signature verified; now safe to parse header
+    let header: any;
+    try {
+      header = JSON.parse(Buffer.from(headerB64, "base64url").toString());
+    } catch {
+      throw new InvalidTokenError("Invalid token header");
+    }
+
+    if (header.alg !== "HS256" || header.typ !== "JWT") {
+      throw new InvalidTokenError("Invalid token header");
+    }
+
+    // Parse payload
+    let payload: any;
+    try {
+      payload = JSON.parse(Buffer.from(bodyB64, "base64url").toString());
+    } catch {
+      throw new InvalidTokenError("Invalid token payload");
+    }
+
+    // exp must be present and a finite number
+    if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) {
+      throw new InvalidTokenError("Token missing or invalid exp claim");
+    }
+
+    if (payload.exp < Math.floor(Date.now() / 1000)) {
+      throw new InvalidTokenError("Token expired");
+    }
+
+    return payload;
+  } catch (error) {
+    // Convert any unexpected errors to InvalidTokenError
+    if (error instanceof InvalidTokenError) {
+      throw error;
+    }
+    throw new InvalidTokenError("Invalid token");
   }
-
-  const expected = crypto
-    .createHmac("sha256", JWT_SECRET)
-    .update(`${headerB64}.${body}`)
-    .digest("base64url");
-  if (!safeCompareSignatures(sig, expected)) {
-    throw new Error("Invalid token signature");
-  }
-
-  const payload = JSON.parse(Buffer.from(body, "base64url").toString());
-
-  // exp must be present and a finite number; reject tokens without it.
-  if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) {
-    throw new Error("Token missing or invalid exp claim");
-  }
-  if (payload.exp < Math.floor(Date.now() / 1000)) {
-    throw new Error("Token expired");
-  }
-
-  return payload;
 }
 
 export { TOKEN_EXPIRY };
