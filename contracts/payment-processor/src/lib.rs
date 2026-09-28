@@ -134,12 +134,17 @@ impl PaymentProcessorContract {
             daily_limit,
         };
 
-        let _ttl_key = DataKey::TokenConfig(token);
+        let _ttl_key = DataKey::TokenConfig(token.clone());
         env.storage().persistent().set(&_ttl_key, &config);
         env.storage().persistent().extend_ttl(
             &_ttl_key,
             PERSISTENT_LIFETIME_THRESHOLD,
             PERSISTENT_BUMP_AMOUNT,
+        );
+
+        env.events().publish(
+            (symbol_short!("token"), symbol_short!("added")),
+            (token, min_amount, daily_limit),
         );
     }
 
@@ -156,7 +161,12 @@ impl PaymentProcessorContract {
 
         env.storage()
             .persistent()
-            .remove(&DataKey::TokenConfig(token));
+            .remove(&DataKey::TokenConfig(token.clone()));
+
+        env.events().publish(
+            (symbol_short!("token"), symbol_short!("removed")),
+            token,
+        );
     }
 
     /// Process a payment
@@ -316,9 +326,19 @@ impl PaymentProcessorContract {
         if fee_bps > 1000 {
             panic!("fee too high"); // max 10%
         }
+        let old_fee_bps: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PlatformFeeBps)
+            .unwrap_or(250);
         env.storage()
             .instance()
             .set(&DataKey::PlatformFeeBps, &fee_bps);
+
+        env.events().publish(
+            (symbol_short!("fee"), symbol_short!("updated")),
+            (old_fee_bps, fee_bps),
+        );
     }
 
     // ============================================================
