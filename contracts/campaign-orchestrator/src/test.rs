@@ -251,18 +251,24 @@ fn test_record_view_insufficient_budget() {
     let id = c.create_campaign(&CampaignCreateArgs {
         advertiser: advertiser.clone(),
         campaign_type: 1u32,
-        budget: 200i128,
-        cost_per_view: 100i128,
+        budget: 1_000_000i128,
+        cost_per_view: 500_000i128,
         duration: 1000u32,
         target_views: 20_000u64,
         daily_view_limit: 20_000u64,
         refundable: true,
     });
 
-    // First view: 100 stroops spent, 100 remaining
+    // First view: 500_000 stroops spent, 500_000 remaining
     c.record_view(&id, &publisher);
-    // Second view: 100 stroops spent, 0 remaining
+    let campaign = c.get_campaign(&id).unwrap();
+    assert_eq!(campaign.remaining_budget, 500_000);
+
+    // Second view: 500_000 stroops spent, 0 remaining
     c.record_view(&id, &publisher);
+    let campaign = c.get_campaign(&id).unwrap();
+    assert_eq!(campaign.remaining_budget, 0);
+
     // Third view should fail with insufficient budget
     c.record_view(&id, &publisher);
 }

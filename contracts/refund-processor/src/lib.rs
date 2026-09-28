@@ -163,6 +163,11 @@ impl RefundProcessorContract {
             .instance()
             .set(&DataKey::RefundCounter, &refund_id);
 
+        env.events().publish(
+            (symbol_short!("refund"), symbol_short!("requested")),
+            (refund_id, campaign_id, requester, amount),
+        );
+
         refund_id
     }
 
@@ -207,6 +212,11 @@ impl RefundProcessorContract {
             PERSISTENT_LIFETIME_THRESHOLD,
             PERSISTENT_BUMP_AMOUNT,
         );
+
+        env.events().publish(
+            (symbol_short!("refund"), symbol_short!("approved")),
+            (refund_id, refund.amount_approved),
+        );
     }
 
     pub fn reject_refund(env: Env, admin: Address, refund_id: u64) {
@@ -243,6 +253,11 @@ impl RefundProcessorContract {
             &_ttl_key,
             PERSISTENT_LIFETIME_THRESHOLD,
             PERSISTENT_BUMP_AMOUNT,
+        );
+
+        env.events().publish(
+            (symbol_short!("refund"), symbol_short!("rejected")),
+            (refund_id, refund.campaign_id),
         );
     }
 

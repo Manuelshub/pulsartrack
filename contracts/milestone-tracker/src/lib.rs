@@ -116,7 +116,7 @@ impl MilestoneTrackerContract {
         let milestone = Milestone {
             milestone_id,
             campaign_id,
-            advertiser,
+            advertiser: advertiser.clone(),
             description,
             target_metric,
             target_value,
@@ -150,6 +150,11 @@ impl MilestoneTrackerContract {
             &_ttl_key,
             PERSISTENT_LIFETIME_THRESHOLD,
             PERSISTENT_BUMP_AMOUNT,
+        );
+
+        env.events().publish(
+            (symbol_short!("milestone"), symbol_short!("created")),
+            (milestone_id, campaign_id, advertiser),
         );
 
         milestone_id
@@ -234,6 +239,11 @@ impl MilestoneTrackerContract {
             PERSISTENT_LIFETIME_THRESHOLD,
             PERSISTENT_BUMP_AMOUNT,
         );
+
+        env.events().publish(
+            (symbol_short!("milestone"), symbol_short!("disputed")),
+            (milestone_id, caller),
+        );
     }
 
     pub fn resolve_dispute(env: Env, admin: Address, milestone_id: u64, achieved: bool) {
@@ -268,6 +278,11 @@ impl MilestoneTrackerContract {
             &_ttl_key,
             PERSISTENT_LIFETIME_THRESHOLD,
             PERSISTENT_BUMP_AMOUNT,
+        );
+
+        env.events().publish(
+            (symbol_short!("milestone"), symbol_short!("resolved")),
+            (milestone_id, achieved),
         );
     }
 
@@ -313,6 +328,11 @@ impl MilestoneTrackerContract {
             PERSISTENT_LIFETIME_THRESHOLD,
             PERSISTENT_BUMP_AMOUNT,
         );
+
+        env.events().publish(
+            (symbol_short!("milestone"), symbol_short!("missed")),
+            (milestone_id, milestone.campaign_id),
+        );
     }
 
     pub fn set_oracle(env: Env, admin: Address, new_oracle: Address) {
@@ -324,9 +344,19 @@ impl MilestoneTrackerContract {
         if admin != stored_admin {
             panic!("unauthorized");
         }
+        let old_oracle: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::OracleAddress)
+            .unwrap();
         env.storage()
             .instance()
             .set(&DataKey::OracleAddress, &new_oracle);
+
+        env.events().publish(
+            (symbol_short!("oracle"), symbol_short!("updated")),
+            (old_oracle, new_oracle),
+        );
     }
 
     pub fn get_campaign_milestone_count(env: Env, campaign_id: u64) -> u64 {
