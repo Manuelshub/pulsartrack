@@ -19,11 +19,21 @@ function generateNonce(): string {
  * next.config.ts, which could not use nonces (evaluated once at build)
  * and defaulted to report-only with no reporting endpoint (#918).
  *
+ * The nonce and CSP are forwarded on the **request** headers so that
+ * Next.js's server renderer can read them (via `headers()`) and attach
+ * the nonce to its own bootstrap/hydration <script> tags. The CSP is
+ * also written to the **response** headers so the browser enforces it.
+ *
  * CSP_MODE env var controls enforcement:
  *   - "enforce" → Content-Security-Policy (blocks violations)
  *   - anything else or unset → Content-Security-Policy-Report-Only
+ *
+ * Note: pages that are statically prerendered at build time cannot receive
+ * a per-request nonce. Those routes must be converted to dynamic rendering
+ * (e.g. `export const dynamic = 'force-dynamic'`) before switching
+ * CSP_MODE to "enforce".
  */
-export function middleware(_request: NextRequest) {
+export function middleware(request: NextRequest) {
   const nonce = generateNonce();
   const isDev = process.env.NODE_ENV !== "production";
   const enforceCsp = process.env.CSP_MODE === "enforce";
@@ -41,7 +51,19 @@ export function middleware(_request: NextRequest) {
     ? "Content-Security-Policy"
     : "Content-Security-Policy-Report-Only";
 
-  const response = NextResponse.next();
+  // Forward the nonce and CSP on the request so the Next.js renderer (server
+  // components / layouts) can read them via `headers()` and inject the nonce
+  // on <script> tags. Without this, Next.js never sees the nonce and its own
+  // bootstrap scripts will be blocked when enforcement is enabled.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("X-Nonce", nonce);
+  requestHeaders.set(cspHeaderName, csp);
+
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+
+  // Also set security headers on the response so the browser enforces the policy.
   response.headers.set(cspHeaderName, csp);
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
@@ -54,9 +76,6 @@ export function middleware(_request: NextRequest) {
     "Strict-Transport-Security",
     "max-age=63072000; includeSubDomains",
   );
-  // Pass the nonce to server components via a request header so layouts
-  // can inject it on <script> tags.
-  response.headers.set("X-Nonce", nonce);
 
   return response;
 }

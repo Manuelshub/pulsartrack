@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Header } from "@/components/header";
@@ -62,15 +63,24 @@ export const metadata: Metadata = {
 };
 
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read the nonce forwarded by middleware (via request headers) so that any
+  // inline <script nonce={nonce}> tags in this layout are allowed by the CSP.
+  // Next.js also reads the nonce from request headers automatically and adds it
+  // to its own bootstrap/hydration scripts.
+  const nonce = (await headers()).get("X-Nonce") ?? undefined;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} antialiased bg-gray-50 dark:bg-gray-950`}
+        // Pass the nonce as a data attribute so client components can read it
+        // when they need to create inline scripts (e.g. third-party embeds).
+        data-nonce={nonce}
       >
         <Providers>
           <Header />
