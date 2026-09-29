@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import * as campaignsRepo from '../db/repositories/campaigns';
 import { callReadOnly } from '../services/soroban-client';
 import { CONTRACT_IDS } from '../config/stellar';
-import { requireAuth, rateLimitWrite } from '../middleware/auth';
+import { requireAuth, rateLimitWrite, getAuthedAddress } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 
 const router = Router();
@@ -47,7 +47,9 @@ router.post('/', requireAuth, rateLimitWrite(), validate({
   },
 }), async (req: Request, res: Response) => {
   try {
-    const address = req.stellarAddress;
+    const address = getAuthedAddress(req, res);
+    if (!address) return; // Response already sent with 401
+
     const { title, contentId, budgetStroops, dailyBudgetStroops } = req.body;
 
     const campaign = await campaignsRepo.create({

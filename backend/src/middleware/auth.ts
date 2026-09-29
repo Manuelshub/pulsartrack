@@ -89,6 +89,26 @@ export function requireAuth(
   }
 }
 
+/**
+ * Helper function to extract authenticated Stellar address from request.
+ * Returns the address if present, otherwise sends 401 response and returns null.
+ * Use this in route handlers to narrow the type from `string | undefined` to `string`.
+ * 
+ * @param req - Express request object
+ * @param res - Express response object
+ * @returns The authenticated Stellar address, or null if not present (response already sent)
+ */
+export function getAuthedAddress(
+  req: Request,
+  res: Response,
+): string | null {
+  if (!req.stellarAddress) {
+    res.status(401).json({ error: "Authentication required" });
+    return null;
+  }
+  return req.stellarAddress;
+}
+
 export const authRouter = Router();
 authRouter.get("/challenge", getChallenge);
 authRouter.post("/verify", verifySignature);
