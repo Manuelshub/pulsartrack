@@ -75,7 +75,7 @@ impl MockGovToken {
         if let Some(v) = env
             .storage()
             .persistent()
-            .get::<u32, i128>(&(-1i32 as u32, ledger_sequence))
+            .get::<(u32, u32), i128>(&(-1i32 as u32, ledger_sequence))
         {
             return v;
         }
