@@ -49,6 +49,7 @@ export default function GovernancePage() {
     description: '',
     votingPeriodDays: 7,
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Fetch governance data
   const { data: balance, isLoading: balanceLoading } = useGovernanceBalance(
@@ -312,6 +313,15 @@ export default function GovernancePage() {
                   className="space-y-4"
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    setFormError(null);
+                    if (!proposalData.title.trim()) {
+                      setFormError('Title is required');
+                      return;
+                    }
+                    if (!proposalData.description.trim() || proposalData.description.length < 50) {
+                      setFormError('Description must be at least 50 characters');
+                      return;
+                    }
                     try {
                       await createProposal({
                         title: proposalData.title,
@@ -342,10 +352,12 @@ export default function GovernancePage() {
                       onChange={(e) =>
                         setProposalData({ ...proposalData, title: e.target.value })
                       }
+                      maxLength={120}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       placeholder="A concise title for your proposal"
                       required
                     />
+                    <p className="text-xs text-gray-400 mt-1 text-right">{proposalData.title.length}/120</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -361,6 +373,9 @@ export default function GovernancePage() {
                       placeholder="Detailed explanation of the proposed change and its rationale..."
                       required
                     />
+                    <p className="text-xs text-gray-400 mt-1">
+                      {proposalData.description.length} chars {proposalData.description.length < 50 && `(need ${50 - proposalData.description.length} more)`}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -381,6 +396,11 @@ export default function GovernancePage() {
                       required
                     />
                   </div>
+                  {formError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                      {formError}
+                    </div>
+                  )}
                   <button
                     type="submit"
                     disabled={createLoading}
