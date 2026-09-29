@@ -73,6 +73,9 @@ Example: `fix/wallet-connection-timeout`
 
 3. Run tests locally before committing:
    ```bash
+   # Format contracts (required — CI runs cargo fmt --all -- --check)
+   cargo fmt --all
+
    # Test contracts
    cargo test --workspace
    
@@ -229,6 +232,7 @@ Once all checks pass and you have approval, the PR will be automatically merged.
 - Follow standard Rust formatting with `rustfmt`
 - Use meaningful variable and function names
 - Add documentation comments for public APIs
+- Run `cargo fmt --all` before committing to ensure all files pass the CI formatting check (`cargo fmt --all -- --check`)
 - Run `cargo clippy` before committing
 
 ### TypeScript (Backend/Frontend)

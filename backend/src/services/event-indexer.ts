@@ -42,8 +42,10 @@ async function poll() {
     const startSeq = Number(await ledgerEventsRepo.getLatestSequence());
     const server = getServer();
 
-    // getEvents returns contract events in a range; start from the next ledger
-    const from = startSeq > 0 ? startSeq + 1 : undefined;
+    // getEvents uses a discriminated union: ledger-range mode requires a
+    // concrete number for startLedger (not undefined). Fall back to ledger 1
+    // on the first run when no events have been indexed yet.
+    const from: number = startSeq > 0 ? startSeq + 1 : 1;
     const response = await server.getEvents({
       startLedger: from,
       limit: MAX_EVENTS_PER_POLL,
@@ -55,9 +57,11 @@ async function poll() {
       let written = 0;
       for (let i = 0; i < events.length; i++) {
         const event = events[i];
-        const txHash = event.transactionHash || '';
+        // SDK BaseEventResponse exposes txHash, not transactionHash
+        const txHash = event.txHash || '';
         const ledgerSeq = event.ledger || 0;
-        const contractId = event.contractId || '';
+        // contractId is typed as Contract (SDK class) — convert to string
+        const contractId = event.contractId ? event.contractId.toString() : '';
         const eventType = event.topic?.[0] || 'unknown';
         const eventData = event.value || null;
 

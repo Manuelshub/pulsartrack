@@ -949,9 +949,7 @@ impl GovernanceTokenContract {
         );
 
         let count_key = DataKey::TotalSupplyCheckpointCount;
-        env.storage()
-            .persistent()
-            .set(&count_key, &(count + 1));
+        env.storage().persistent().set(&count_key, &(count + 1));
         env.storage().persistent().extend_ttl(
             &count_key,
             PERSISTENT_LIFETIME_THRESHOLD,
