@@ -150,3 +150,41 @@ describe('requireAuth middleware', () => {
     expect(res.body.contracts).toBeDefined();
   });
 });
+
+describe('getAuthedAddress helper', () => {
+  it('should return address when req.stellarAddress is set', async () => {
+    const { getAuthedAddress } = await import('../middleware/auth');
+    const mockReq = { stellarAddress: 'GA4LYCAMDLLOJPGXHQCHHPXBISH5RAWSS7ZTCSQAPKASBXG4NTB5MJ6N' } as any;
+    const mockRes = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+    
+    const address = getAuthedAddress(mockReq, mockRes);
+    
+    expect(address).toBe('GA4LYCAMDLLOJPGXHQCHHPXBISH5RAWSS7ZTCSQAPKASBXG4NTB5MJ6N');
+    expect(mockRes.status).not.toHaveBeenCalled();
+    expect(mockRes.json).not.toHaveBeenCalled();
+  });
+
+  it('should return null and send 401 when req.stellarAddress is missing', async () => {
+    const { getAuthedAddress } = await import('../middleware/auth');
+    const mockReq = {} as any;
+    const mockRes = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+    
+    const address = getAuthedAddress(mockReq, mockRes);
+    
+    expect(address).toBeNull();
+    expect(mockRes.status).toHaveBeenCalledWith(401);
+    expect(mockRes.json).toHaveBeenCalledWith({ error: 'Authentication required' });
+  });
+
+  it('should return null and send 401 when req.stellarAddress is undefined', async () => {
+    const { getAuthedAddress } = await import('../middleware/auth');
+    const mockReq = { stellarAddress: undefined } as any;
+    const mockRes = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+    
+    const address = getAuthedAddress(mockReq, mockRes);
+    
+    expect(address).toBeNull();
+    expect(mockRes.status).toHaveBeenCalledWith(401);
+    expect(mockRes.json).toHaveBeenCalledWith({ error: 'Authentication required' });
+  });
+});
