@@ -1,25 +1,30 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../app';
-import pool from '../config/database';
+import prisma from '../db/prisma';
 import { generateTestToken } from '../test-utils';
 
 describe('Campaign Routes', () => {
     const mockAddress = 'GB7V7Z5K64I6U6I7U6I7U6I7U6I7U6I7U6I7U6I7U6I7U6I7U6I7';
     const token = generateTestToken(mockAddress);
 
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     describe('GET /api/campaigns/stats', () => {
         // Issue #369 — mock uses string values matching PostgreSQL bigint columns,
         // and assertions verify both the numeric type and value after conversion.
         it('should return campaign statistics with correct numeric conversions', async () => {
-            (pool.query as any).mockResolvedValue({
-                rows: [{
-                    total_campaigns: '10',       // PostgreSQL returns bigint as string
-                    active_campaigns: '5',
-                    total_impressions: '1000',
-                    total_clicks: '50',
-                    total_spent_stroops: '100000000', // 100 000 000 stroops = 10 XLM
-                }]
+            // Mock Prisma methods used by getStats()
+            (prisma.campaign.count as any).mockResolvedValueOnce(10);
+            (prisma.campaign.count as any).mockResolvedValueOnce(5);
+            (prisma.campaign.aggregate as any).mockResolvedValueOnce({
+                _sum: {
+                    impressions: BigInt(1000),
+                    clicks: BigInt(50),
+                    spentStroops: BigInt(100000000), // 100 000 000 stroops = 10 XLM
+                }
             });
 
             const response = await request(app).get('/api/campaigns/stats');
@@ -41,14 +46,14 @@ describe('Campaign Routes', () => {
         });
 
         it('should convert zero stroops to 0 XLM', async () => {
-            (pool.query as any).mockResolvedValue({
-                rows: [{
-                    total_campaigns: '0',
-                    active_campaigns: '0',
-                    total_impressions: '0',
-                    total_clicks: '0',
-                    total_spent_stroops: '0',
-                }]
+            (prisma.campaign.count as any).mockResolvedValueOnce(0);
+            (prisma.campaign.count as any).mockResolvedValueOnce(0);
+            (prisma.campaign.aggregate as any).mockResolvedValueOnce({
+                _sum: {
+                    impressions: BigInt(0),
+                    clicks: BigInt(0),
+                    spentStroops: BigInt(0),
+                }
             });
 
             const response = await request(app).get('/api/campaigns/stats');
@@ -60,14 +65,14 @@ describe('Campaign Routes', () => {
 
         it('should handle large stroops values without precision loss', async () => {
             // 1 billion XLM in stroops — tests large integer handling
-            (pool.query as any).mockResolvedValue({
-                rows: [{
-                    total_campaigns: '1',
-                    active_campaigns: '1',
-                    total_impressions: '999999',
-                    total_clicks: '12345',
-                    total_spent_stroops: '10000000000000000', // 1 000 000 000 XLM
-                }]
+            (prisma.campaign.count as any).mockResolvedValueOnce(1);
+            (prisma.campaign.count as any).mockResolvedValueOnce(1);
+            (prisma.campaign.aggregate as any).mockResolvedValueOnce({
+                _sum: {
+                    impressions: BigInt(999999),
+                    clicks: BigInt(12345),
+                    spentStroops: BigInt('10000000000000000'), // 1 000 000 000 XLM
+                }
             });
 
             const response = await request(app).get('/api/campaigns/stats');
@@ -87,15 +92,20 @@ describe('Campaign Routes', () => {
                 dailyBudgetStroops: 5000000
             };
 
-            (pool.query as any).mockResolvedValue({
-                rows: [{
-                    id: 'uuid-1',
-                    campaign_id: 1,
-                    title: campaignData.title,
-                    content_id: campaignData.contentId,
-                    budget_stroops: campaignData.budgetStroops,
-                    daily_budget_stroops: campaignData.dailyBudgetStroops
-                }]
+            (prisma.campaign.create as any).mockResolvedValue({
+                id: 'uuid-1',
+                campaignId: BigInt(1),
+                title: campaignData.title,
+                contentId: campaignData.contentId,
+                budgetStroops: BigInt(campaignData.budgetStroops),
+                dailyBudgetStroops: BigInt(campaignData.dailyBudgetStroops),
+                advertiser: mockAddress,
+                status: 'Active',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                impressions: BigInt(0),
+                clicks: BigInt(0),
+                spentStroops: BigInt(0),
             });
 
             const response = await request(app)
@@ -104,7 +114,7 @@ describe('Campaign Routes', () => {
                 .send(campaignData);
 
             expect(response.status).toBe(201);
-            expect(response.body).toHaveProperty('campaign_id');
+            expect(response.body).toHaveProperty('campaignId');
             expect(response.body.title).toBe(campaignData.title);
         });
 
