@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../app';
-import pool from '../config/database';
+import prisma from '../db/prisma';
 import { generateTestToken } from '../test-utils';
 
 describe('Publisher Routes', () => {
@@ -14,19 +14,22 @@ describe('Publisher Routes', () => {
 
     describe('GET /api/publishers/leaderboard', () => {
         it('should return publisher leaderboard', async () => {
-            (pool.query as any).mockResolvedValueOnce({
-                rows: [
-                    {
-                        address: mockAddress,
-                        display_name: 'Top Pub',
-                        tier: 'Gold',
-                        reputation_score: 900,
-                        impressions_served: '10000',
-                        earnings_stroops: '500000000',
-                        last_activity: new Date()
-                    }
-                ]
-            });
+            (prisma.publisher.findMany as any).mockResolvedValue([
+                {
+                    id: 'pub-uuid',
+                    address: mockAddress,
+                    displayName: 'Top Pub',
+                    tier: 'Gold',
+                    reputationScore: 900,
+                    impressionsServed: BigInt(10000),
+                    earningsStroops: BigInt(500000000),
+                    lastActivity: new Date(),
+                    website: null,
+                    status: 'Verified',
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                }
+            ]);
 
             const response = await request(app).get('/api/publishers/leaderboard');
 
@@ -43,13 +46,23 @@ describe('Publisher Routes', () => {
                 website: 'https://newpub.com'
             };
 
-            (pool.query as any).mockResolvedValueOnce({
-                rows: [{
-                    id: 'pub-uuid',
-                    address: mockAddress,
-                    display_name: pubData.displayName,
-                    website: pubData.website
-                }]
+            // Mock findByAddress to return null (publisher doesn't exist)
+            (prisma.publisher.findUnique as any).mockResolvedValue(null);
+
+            // Mock create to return new publisher
+            (prisma.publisher.create as any).mockResolvedValue({
+                id: 'pub-uuid',
+                address: mockAddress,
+                displayName: pubData.displayName,
+                website: pubData.website,
+                tier: 'Bronze',
+                status: 'Pending',
+                reputationScore: 0,
+                impressionsServed: BigInt(0),
+                earningsStroops: BigInt(0),
+                lastActivity: new Date(),
+                createdAt: new Date(),
+                updatedAt: new Date(),
             });
 
             const response = await request(app)
@@ -58,7 +71,7 @@ describe('Publisher Routes', () => {
                 .send(pubData);
 
             expect(response.status).toBe(201);
-            expect(response.body.display_name).toBe(pubData.displayName);
+            expect(response.body.displayName).toBe(pubData.displayName);
         });
 
         it('should return 401 when not authenticated', async () => {
@@ -70,8 +83,20 @@ describe('Publisher Routes', () => {
         });
 
         it('should return 409 when publisher already registered', async () => {
-            (pool.query as any).mockResolvedValueOnce({
-                rows: []
+            // Mock findByAddress to return an existing publisher
+            (prisma.publisher.findUnique as any).mockResolvedValue({
+                id: 'existing-pub-uuid',
+                address: mockAddress,
+                displayName: 'Existing Publisher',
+                website: 'https://existing.com',
+                tier: 'Gold',
+                status: 'Verified',
+                reputationScore: 800,
+                impressionsServed: BigInt(5000),
+                earningsStroops: BigInt(200000000),
+                lastActivity: new Date(),
+                createdAt: new Date(),
+                updatedAt: new Date(),
             });
 
             const response = await request(app)

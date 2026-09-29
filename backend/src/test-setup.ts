@@ -37,6 +37,7 @@ vi.mock('./db/prisma', () => ({
             update: vi.fn(),
             delete: vi.fn(),
             count: vi.fn(),
+            aggregate: vi.fn(),
         },
         publisher: {
             findMany: vi.fn(),
