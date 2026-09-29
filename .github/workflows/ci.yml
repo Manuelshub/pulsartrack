@@ -20,6 +20,10 @@ jobs:
           components: rustfmt, clippy
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          # Cache workspace crates in addition to dependencies for faster rebuilds
+          # in a 45-crate workspace where internal crates change less frequently
+          cache-workspace-crates: "true"
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run Clippy

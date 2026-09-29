@@ -27,6 +27,9 @@ jobs:
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+        with:
+          # Cache workspace crates in addition to dependencies for faster rebuilds
+          cache-workspace-crates: "true"
 
       # A prebuilt release binary, instead of compiling the CLI from source.
       - name: Install Stellar CLI
